@@ -1,0 +1,272 @@
+// Prisma Schema for Ayamu Labs Studio CMS & Showcase
+// Database: PostgreSQL (via Supabase)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// -----------------------------------------------------------------------------
+// ENUMS
+// -----------------------------------------------------------------------------
+
+enum PublishStatus {
+  PUBLISHED
+  DRAFT
+}
+
+enum AspectRatio {
+  LANDSCAPE
+  PORTRAIT
+  SQUARE
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+}
+
+// -----------------------------------------------------------------------------
+// 1. CATEGORY TAXONOMY
+// -----------------------------------------------------------------------------
+
+model Category {
+  id          String    @id @default(cuid())
+  name        String
+  slug        String    @unique
+  description String?   @db.Text
+  iconName    String    @default("Folder")
+  order       Int       @default(0)
+  artworks    Artwork[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@map("categories")
+}
+
+// -----------------------------------------------------------------------------
+// 2. TAG SYSTEM
+// -----------------------------------------------------------------------------
+
+model Tag {
+  id        String       @id @default(cuid())
+  name      String       @unique
+  slug      String       @unique
+  artworks  ArtworkTag[]
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  @@map("tags")
+}
+
+// -----------------------------------------------------------------------------
+// 3. PORTFOLIO & ARTWORK SHOWCASE
+// -----------------------------------------------------------------------------
+
+model Artwork {
+  id           String        @id @default(cuid())
+  slug         String        @unique
+  title        String
+  subtitle     String?
+  year         String        @default("2026")
+  client       String?
+  roles        String[]      @default([])
+  description  String        @db.Text
+  conceptStory String        @db.Text
+  coverImage   String
+  aspectRatio  AspectRatio   @default(LANDSCAPE)
+  status       PublishStatus @default(PUBLISHED)
+  isFeatured   Boolean       @default(false)
+  order        Int           @default(0)
+  views        Int           @default(0)
+  likes        Int           @default(0)
+  tools        String[]      @default([])
+  vgenUrl      String?
+  fiverrUrl    String?
+
+  // Relations
+  categoryId  String
+  category    Category            @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  tags        ArtworkTag[]
+  gallery     ArtworkMedia[]
+  beforeAfter ArtworkBeforeAfter?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([categoryId])
+  @@index([status])
+  @@index([isFeatured])
+  @@map("artworks")
+}
+
+// -----------------------------------------------------------------------------
+// 4. GALLERY MEDIA ITEMS
+// -----------------------------------------------------------------------------
+
+model ArtworkMedia {
+  id        String    @id @default(cuid())
+  artworkId String
+  artwork   Artwork   @relation(fields: [artworkId], references: [id], onDelete: Cascade)
+  url       String
+  type      MediaType @default(IMAGE)
+  caption   String?   @default("")
+  order     Int       @default(0)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([artworkId])
+  @@map("artwork_media")
+}
+
+// -----------------------------------------------------------------------------
+// 5. BEHIND THE CRAFT (BEFORE / AFTER COMPARISON)
+// -----------------------------------------------------------------------------
+
+model ArtworkBeforeAfter {
+  id          String   @id @default(cuid())
+  artworkId   String   @unique
+  artwork     Artwork  @relation(fields: [artworkId], references: [id], onDelete: Cascade)
+  beforeImage String
+  beforeLabel String   @default("Rough Sketch")
+  afterImage  String
+  afterLabel  String   @default("Final Render")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("artwork_before_after")
+}
+
+// -----------------------------------------------------------------------------
+// 6. ARTWORK-TAG JUNCTION TABLE
+// -----------------------------------------------------------------------------
+
+model ArtworkTag {
+  artworkId String
+  artwork   Artwork  @relation(fields: [artworkId], references: [id], onDelete: Cascade)
+  tagId     String
+  tag       Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([artworkId, tagId])
+  @@index([tagId])
+  @@index([artworkId])
+  @@map("artwork_tags")
+}
+
+// -----------------------------------------------------------------------------
+// 7. STUDIO PROFILE & CHARACTER LORE
+// -----------------------------------------------------------------------------
+
+model StudioProfile {
+  id                      String   @id @default("default")
+  name                    String   @default("Ayamu Labs")
+  tagline                 String   @default("Where Imagination Hatches Into Immersive Visual Masterpieces")
+  slogan                  String   @default("Creative Studio")
+  characterName           String   @default("Ayamu Hamiru")
+  characterNickname       String   @default("Ayamu")
+  characterBio            String   @db.Text
+  characterAvatar         String   @default("/images/ayamu-hamiru.jpg")
+  vgenUrl                 String   @default("https://vgen.co/ayamulabs")
+  fiverrUrl               String   @default("https://www.fiverr.com/ayamulabs")
+  discordUrl              String   @default("https://discord.gg/ayamulabs")
+  email                   String   @default("ayamuhamiru@gmail.com")
+  xUrl                    String   @default("https://x.com/ayamulabs")
+  artstationUrl           String   @default("https://artstation.com/ayamulabs")
+  statsProjectsCompleted  Int      @default(140)
+  statsGlobalClients      Int      @default(85)
+  statsAwardsRecognitions Int      @default(12)
+  statsHoursRendered      Int      @default(3200)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  @@map("studio_profile")
+}
+
+// -----------------------------------------------------------------------------
+// 8. STUDIO TEAM MEMBERS
+// -----------------------------------------------------------------------------
+
+model TeamMember {
+  id          String   @id @default(cuid())
+  name        String
+  nickname    String?
+  role        String
+  bio         String   @db.Text
+  avatar      String
+  specialties String[] @default([])
+  socials     Json? // e.g. { "artstation": "...", "x": "...", "github": "..." }
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("team_members")
+}
+
+// -----------------------------------------------------------------------------
+// 9. STUDIO OFFERINGS & SERVICES OVERVIEW
+// -----------------------------------------------------------------------------
+
+model StudioOffering {
+  id          String   @id @default(cuid())
+  title       String
+  description String   @db.Text
+  iconName    String   @default("Palette")
+  badge       String   @default("Popular")
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("studio_offerings")
+}
+
+// -----------------------------------------------------------------------------
+// 10. WORKFLOW STEPS
+// -----------------------------------------------------------------------------
+
+model WorkflowStep {
+  id          String   @id @default(cuid())
+  step        String // e.g. "01", "02", "03", "04"
+  title       String
+  description String   @db.Text
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("workflow_steps")
+}
+
+// -----------------------------------------------------------------------------
+// 11. FAQ ITEMS
+// -----------------------------------------------------------------------------
+
+model FAQItem {
+  id        String   @id @default(cuid())
+  question  String
+  answer    String   @db.Text
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("faq_items")
+}
+
+// -----------------------------------------------------------------------------
+// 12. CHARACTER DESIGN PHILOSOPHY
+// -----------------------------------------------------------------------------
+
+model CharacterPhilosophy {
+  id          String   @id @default(cuid())
+  title       String
+  description String   @db.Text
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("character_philosophies")
+}
